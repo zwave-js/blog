@@ -9,21 +9,21 @@ code {
   font-family: $monospace-font-family;
 }
 
-code {
-  color: #7a7a7a;
-}
+// code {
+//   color: #7a7a7a;
+// }
 
 pre {
   padding: 1.125em;
-  line-height: 1.11;
+  line-height: 1.4;
   overflow-x: scroll;
   margin-bottom: 0.88em;
-  background-color: $pre-background-color;
+  // background-color: $pre-background-color;
 }
 
 .highlight .p {
   font-size: 1.125rem;
-  line-height: 1;
+  // line-height: 1.8;
 }
 
 pre {

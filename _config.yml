@@ -1,7 +1,7 @@
 title: "Z-Wave JS Blog"
 description: "Tales of an IoT Wizard"
-url: "https://zwave-js.github.io"
-baseurl: "/blog"
+url: "https://blog.zwave-js.io"
+# baseurl: "/blog"
 date_format: "%b %-d, %Y"
 # header_pages:
 #   - home.html

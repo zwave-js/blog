@@ -117,9 +117,12 @@ permalink:    pretty
 paginate:     4
 sass:
   style: compressed
+feed:
+  excerpt_only: true
 plugins:
   - jekyll-paginate
   - jekyll-sitemap
+  - jekyll-feed
 # https://github.com/jekyll/jekyll/issues/2938
 exclude:
   - Gemfile

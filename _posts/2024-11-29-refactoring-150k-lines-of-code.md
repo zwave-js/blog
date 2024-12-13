@@ -5,6 +5,8 @@ author: Al Calzone
 title: "Refactoring 150k lines of code, part 1"
 summary: |-
   Or: <i>Trying out Rust's traits in TypeScript</i>
+excerpt: |-
+  Or: <i>Trying out Rust's traits in TypeScript</i>
 # image: chameleon-coding.jpeg
 # feature: chameleon-coding.jpeg
 comments: true

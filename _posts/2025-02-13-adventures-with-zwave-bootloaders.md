@@ -1,5 +1,4 @@
 ---
-
 layout: post
 author: Al Calzone
 title: "Adventures with Z-Wave bootloaders"
@@ -10,7 +9,6 @@ excerpt: |-
 # image: chameleon-coding.jpeg
 # feature: chameleon-coding.jpeg
 comments: true
-
 ---
 
 We [teased last year](https://www.home-assistant.io/blog/2024/05/08/zwave-is-not-dead/#range-testing-our-z-wave-stick-prototype) that we are working on a new Z-Wave antenna/controller/stick prototype at Nabu Casa. I finally have some up to date prototypes in my hands that I use to work on our firmware.
@@ -58,6 +56,7 @@ Of course, Silabs don't want us to do that. Let's implement it anyways.
 ## Let the end device firmware reboot into bootloader
 
 Open the definition file for CLI commands `autogen/sl_cli_command_table.c`, and add the necessary definitions:
+
 ```c
 // Just below the other command method definitions:
 void cli_bootloader(sl_cli_command_arg_t *arguments);
@@ -75,8 +74,8 @@ static const sl_cli_command_info_t cli_cmd__bootloader = \
   // ...just before { NULL, NULL, false },
 ```
 
-
 In `app_cli.c`, add the following command implementation:
+
 ```c
 /******************************************************************************
  * CLI - bootloader: Reboot into bootloader
@@ -113,12 +112,14 @@ Let's try to join a network with Z-Wave Long Range. Since we have no QR code or 
 If you have a bit of Z-Wave knowledge, you might know that Z-Wave controllers store the network information in their non-volatile memory (NVM). End devices do, too. But because it can't ever be easy, end devices use a slightly different area in their flash for this. We can look into the `.map` files the linker generates when building our controller and end device firmwares. Those files contain a lot of information we don't need, and then this near the end:
 
 **Controller firmware**
+
 ```
 0x0807e000   linker_nvm_end = __main_flash_end__
 0x08074000   linker_nvm_begin = (linker_nvm_end - SIZEOF (.nvm))
 ```
 
 **End device firmware**
+
 ```
 0x0807e000   linker_nvm_end = __main_flash_end__
 0x08076000   linker_nvm_begin = (linker_nvm_end - SIZEOF (.nvm))
@@ -181,13 +182,14 @@ Bootloader error 0x44
 
 A bit of digging [in the SDK sources](https://github.com/SiliconLabs/simplicity_sdk/blob/da661283f301b53eec04d1016009e60bc7e34a1f/platform/bootloader/communication/xmodem-uart/btl_comm_xmodem_common.c#L388-L390) reveals that is a parser error `BOOTLOADER_ERROR_PARSER_UNKNOWN_TAG`. But why? I used the same `gbl` file I had previously uploaded to the device and it worked just fine.
 
-`gbl` files contain multiple sections, called *tags*, which contain information about the firmware version, etc., and the firmware image itself. These tags can be encrypted (and signed), to ensure that only the device they are intended for can decrypt them - or someone really dedicated with the right tools:
+`gbl` files contain multiple sections, called _tags_, which contain information about the firmware version, etc., and the firmware image itself. These tags can be encrypted (and signed), to ensure that only the device they are intended for can decrypt them - or someone really dedicated with the right tools:
 
 ![Debugging a Zooz stick](/images/zooz_debug.jpg)
 
 Encrypting the firmware image has multiple reasons. A big one is hiding "proprietary" firmware from competitors - but just with locks, this just keeps honest people out! However it also prevents end users from accidentally installing incompatible firmware. The latter is the reason we'll also be encrypting and signing our firmware, but we'll make the keys open source!
 
-Those encryption and signing keys, along with some other things (all commonly called *tokens*) are stored in a special page in the device's flash memory. They are uploaded during initial programming
+Those encryption and signing keys, along with some other things (all commonly called _tokens_) are stored in a special page in the device's flash memory. They are uploaded during initial programming
+
 ```
 commander flash --tokengroup znet --tokenfile vendor_encrypt.key --tokenfile vendor_sign.key-tokens.txt
 ```
@@ -196,13 +198,16 @@ It just so happens that the page used for token storage comes just after the NVM
 ![NVM and token page layout](/images/token_storage.svg)
 
 And if you look at the code listing above really, really closely, you might spot a bug!
+
 ```c
 uint32_t nvm_address = 0x08074000;
 uint32_t nvm_size = 0x0000c000;
 ```
+
 `0x08074000 + 0x0000c000` is not `0x0807dfff`, but `0x0807ffff`! We're erasing the token storage. This means I just locked myself out, because the encrypted GBL files no longer match the encryption keys on the device, which are now all `0xffff...ffff`.
 
 So, let's fix that.
+
 ```diff
   uint32_t nvm_address = 0x08074000;
 - uint32_t nvm_size = 0x0000c000;
@@ -222,6 +227,7 @@ Now, a long debugging session followed. I started by erasing everything, and fla
 I then compared everything to figure out when, where and how the flash contents changed. I learned a lot from this.
 
 The `EFR32ZG23AxxxF512` chip that we use contains two flash regions:
+
 - Main Flash: address `0x0800_0000`, size 512 KiB
 - User data: address `0x0FE0_0000`, size 1 KiB
 
@@ -234,13 +240,16 @@ The firmware image gets stored in the main flash at address `0x0800_6000`. This 
 The controller firmware also creates empty NVM pages at addresses `0x0806_e000`, `0x0807_0000` and `0x0807_2000`. I can only assume that someone at Silabs forgot to update the initialization code after reducing the NVM size from 64 KiB to 48 KiB (and later 40 KiB) in the 800 series firmwares...
 
 Address `0x0807e3e0...0x0807e3ff` contain some random data, which turns out to be the public key of our end device:
+
 ```
 0007e3e0: 6747 1c12 7f8d 5508 1e3c 6ba8 680e 103d  gG....U..<k.h..=
 0007e3f0: 76ca 28f4 5630 d1de acb2 0586 ebba e95f  v.(.V0........._
 ```
+
 The first 16 bytes are the device-specific key (in this case `26439-07186-32653-21768-07740-27560-26638-04157`), the other 16 are the rest of the public key that the user never sees.
 
 Addresses `0x0807e400 ... 0x0807e459` contain something that looks suspiciously like the QR code
+
 ```
 0807e400: 3930 3031 3132 3038 3430 3033 3037 3230  9001120840030720
 0807e410: 3534 3036 3138 3430 3836 3031 3436 3237  5406184086014627
@@ -250,6 +259,7 @@ Addresses `0x0807e400 ... 0x0807e459` contain something that looks suspiciously 
 0807e450: 3030 3030 3130 3235 3833 FFFF 00FF FFFF  0000102583ÿÿ.ÿÿÿ
 0807e460: 3038 3033 3030 3300 0000 0000 0000 0000  0803003.........
 ```
+
 but then there's a random `FFFF 00FF FFFF` in the middle that does not make sense.
 
 Earlier, I had found some [headers files](https://github.com/SiliconLabs/simplicity_sdk/blob/da661283f301b53eec04d1016009e60bc7e34a1f/protocol/z-wave/Components/MfgTokens/MfgTokens.h#L45-L55) with definitions for the tokens and functions to read them, like `ZW_GetMfgTokenData`, but Silicon Labs have helpfully hidden the implementation in their pre-compiled binaries they ship with the SDK.
@@ -275,11 +285,12 @@ Great, so let's use a debugger and set the ready flag back to `0xff`, so the ini
 Looking at the decompiled code again, the initialization code also enables write protection on the entire flash page. So after it has run, we can't change the flag anymore.
 
 The [EFR32xG23 reference manual](https://www.silabs.com/documents/public/reference-manuals/efr32xg23-rm.pdf) helpfully explains that the **Memory System Controller (MSC)** on our chip is responsible for protecting memory and that the `MSC_PAGELOCK1` register can be used to lock/unlock pages. But it also mentions that we won't be able to unlock the page once it has been locked:
+
 > Host is only allowed to write 1. Root and Debug are allowed to clear this register.
 
 We are **Host**... What now?
 
-The obvious, and easy solution would be having the controller firmware write a QR code on first startup as well, even if it doesn't use it. However, *that* functionality is *also* hidden in Silabs' pre-compiled binaries, because why make something open source that somebody might want to use?! And I'm not particularly keen on cleaning up the messy C code Ghidra spits out.
+The obvious, and easy solution would be having the controller firmware write a QR code on first startup as well, even if it doesn't use it. However, _that_ functionality is _also_ hidden in Silabs' pre-compiled binaries, because why make something open source that somebody might want to use?! And I'm not particularly keen on cleaning up the messy C code Ghidra spits out.
 
 ## Going nuclear
 
@@ -372,3 +383,64 @@ case ERASE_NVM:
 
 Yes, really. No catch this time. It works!  
 _Just took way longer than I had expected..._
+
+## Update 2025-02-22
+
+_Narrator: It did not, in fact, work..._
+
+It turns out that S2 bootstrapping such an end device would fails because it does not send its DSK to the controller.
+
+Some further investigation revealed that some S2 related information is also stored in the NVM, in a format I couldn't be arsed to reverse engineer yet. Luckily the fix is simple: Don't try to preserve the public key, private key, or the QR code, just erase them. Although this causes the end device to generate new keys and a new QR code whenever the NVM is erased, but at least it can be included and works normally.
+
+This shortens the above code a bit:
+
+```c
+// snip ✂️
+case ERASE_NVM:
+  // Erase NVM
+  // The address and size can be determined from the .map files after firmware compilation.
+  // Right now, those are either:
+  // - Controller 0x08074000, size 0xa000
+  // - End device 0x08076000, size 0x8000
+  // ...which both end at address 0x0807dfff
+  uint32_t nvm_address = 0x08074000;
+  uint32_t nvm_size = 0x0000a000;
+  uint32_t zpal_page_size = 0x00002000;
+
+  // In the page at address 0x0807e000, ZPAL stores tokens like the encryption key,
+  // but also the QR code, DSK, etc. The controller firmware does not generate the DSK,
+  // and the end device firmware only does it when the byte at address 0x807e45c is 0xff.
+
+  // For some reason, we can only erase that page, but not unlock it for resetting that byte.
+  // Hence we read the tokens first, erase NVM and the ZPAL page, then restore the tokens
+
+  // It would be much easier to just have the controller firmware also generate a DSK,
+  // but Silabs hides this functionality in the end device binaries...
+
+  uint32_t btl_enc_key_address = 0x0807e284; // Actually at 0x0807e286, but that's not 4-byte aligned
+  uint8_t btl_enc_key_data[20]; // Actually 16 bytes, but we need to read 20 bytes to keep the alignment
+  memcpy(btl_enc_key_data, (uint8_t *)btl_enc_key_address, sizeof(btl_enc_key_data));
+
+  uint32_t btl_sign_key_address = 0x0807e34c;
+  uint8_t btl_sign_key_data[64];
+  memcpy(btl_sign_key_data, (uint8_t *)btl_sign_key_address, sizeof(btl_sign_key_data));
+
+  // Erase all pages that start inside the write range
+  for (uint32_t pageAddress = nvm_address & ~(FLASH_PAGE_SIZE - 1UL);
+      pageAddress < (nvm_address + nvm_size + zpal_page_size);
+      pageAddress += FLASH_PAGE_SIZE) {
+    flash_erasePage(pageAddress);
+  }
+
+  // Write the tokens back to where they belong
+  flash_writeBuffer(btl_enc_key_address, btl_enc_key_data, sizeof(btl_enc_key_data));
+  flash_writeBuffer(btl_sign_key_address, btl_sign_key_data, sizeof(btl_sign_key_data));
+
+  char str[] = "\r\nNVM erased\r\n";
+  uart_sendBuffer((uint8_t *)str, sizeof(str), true);
+
+  // [...]
+  break;
+```
+
+Now it really works, I promise!

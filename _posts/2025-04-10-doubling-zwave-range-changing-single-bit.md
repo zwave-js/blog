@@ -114,3 +114,19 @@ Add another couple of minutes for a bug report to Silicon Labs and they could ha
 Instead, we had to wait 8 months and pending!
 
 At least now there's some competition on the horizon, so maybe this will change in the future. One can only hope!
+
+## Update 2025-04-28
+
+While the pointer hack works, it turned out not to be particularly stable, because the address of `m_TxPowerMode` can change when unrelated code is modified. Any modification to the firmware requires double-checking and potentially adjusting the hack.
+
+Instead, a simpler and more reliable workaround is to modify `GetMaxSupportedTxPower` to always return `ZW_RADIO_TX_POWER_MODE_20DBM`:
+
+```c
+GetMaxSupportedTxPower(void)
+{
+  // Work around incorrect max. TX Power on Simplicity SDK
+  return ZW_TX_POWER_20DBM; // Same as ZW_RADIO_TX_POWER_MODE_20DBM, but available as a define in the SDK
+}
+```
+
+The entire backend functionality including `zpal_radio_get_maximum_tx_power` isn't actually used for anything else, so we can just skip calling it altogether.

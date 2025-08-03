@@ -67,7 +67,7 @@ What does this mean for our example? Let's assume that device A needs +14 dBm to
 - A acks the frame at +6 dBm. ACK does not reach B, because it would need +14 dBm to punch through the noise.
 - ...
 
-In the end, both A and B are now transmitting at +14 dBm, even though 0 dBm would be enough for B → A. Likewise, A sends frames to B at +14 dBm and B acknowledges them at +14 dBm, even though 0 dBm would be enough for A → B.
+In the end, both A and B are now transmitting at +14 dBm, even though 0 dBm would be enough for B to reach A. Likewise, A sends frames to B at +14 dBm and B acknowledges them at +14 dBm, even though 0 dBm would be enough for the ACK.
 
 This is a waste of power and actually **fails to ensure** what the specification we quoted above requires: that the minimum TX power is used.
 
